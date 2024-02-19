@@ -7,7 +7,7 @@ deadnonsmokers = subset(nonsmokers, X.10==1)
 dead = subset(data, X.10==1)
 
 #barplot of cause of death throughout lumaria
-barplot(prop.table(table(dead$X.14)))
+barplot(prop.table(table(dead$X.14)), cex.names = 0.7, las=2)
 
 
 #stacked barplot of the cause of death by each region
@@ -24,10 +24,11 @@ matrix = matrix(c(prop.table(table(region1$X.14)),
                   prop.table(table(region5$X.14)), 
                   prop.table(table(region6$X.14))), ncol=6, byrow=TRUE)
 matrix = t(matrix)
-barplot(matrix, beside = FALSE, col = c("blue", 
-                                       "orange", 
-                                       "red", 
-                                       "yellow", 
-                                       "purple", 
-                                       "pink"))
-        
+colorlist = c("blue", 
+           "orange", 
+           "red", 
+           "yellow", 
+           "purple", 
+           "pink")
+barplot(matrix, names.arg=names(table(dead$X.14)), cex.names = 0.7, las=2, beside = FALSE, col = colorlist)
+legend(x=0,y=0.7, cex=0.5, fill=colorlist, legend=c("region 1", "region 2", "region 3", "region 4", "region 5", "region 6"))
