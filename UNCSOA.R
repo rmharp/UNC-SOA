@@ -9,6 +9,11 @@ dead = subset(data, X.10==1)
 #barplot of cause of death throughout lumaria
 barplot(prop.table(table(dead$X.14)), cex.names = 0.7, las=2)
 
+#barplot of cause of death for smokers in lumaria
+barplot(prop.table(table(deadsmokers$X.14)), main="Smokers Cause of Death", cex.names = 0.7, las=2)
+
+#barplot of cause of death for nonsmokers in lumaria
+barplot(prop.table(table(deadnonsmokers$X.14)), main="Nonsmokers Cause of Death", cex.names = 0.7, las=2)
 
 #stacked barplot of the cause of death by each region
 region1 = subset(dead, X.8==1)
