@@ -1,0 +1,162 @@
+---
+title: '[Riley] SOA'
+output: html_document
+date: '`r Sys.Date()`'
+---
+
+```{r setup, include=FALSE}
+if(!require(dplyr)) {install.packages("dplyr"); library(dplyr)}
+if(!require(tidyverse)) {install.packages("tidyverse"); library(tidyverse)}
+if(!require(rvest)) {install.packages("rvest"); library(rvest)}
+if(!require(RSelenium)) {install.packages("RSelenium"); library(RSelenium)}
+if(!require(wdman)) {install.packages("wdman"); library(wdman)}
+if(!require(netstat)) {install.packages("netstat"); library(netstat)}
+if(!require(xml2)) {install.packages("xml2"); library(xml2)}
+if(!require(webdriver)) {install.packages("webdriver"); library(webdriver)}
+if(!require(purrr)) {install.packages("purrr"); library(purrr)}
+if (!require(here)) {install.packages("here"); library(here)}
+if (!require(dotenv)) {install.packages("dotenv"); library(dotenv)}
+if (!require(ggplot2)) {install.packages("ggplot2"); library(ggplot2)}
+if (!require(readxl)) {install.packages("readxl"); library(readxl)}
+if (!require(mgcv)) {install.packages("mgcv"); library(mgcv)}
+```
+
+```{r data}
+data = read.csv("./data/2024-srcsc-superlife-inforce-dataset.csv")
+inflationrates = read_excel("./data/srcsc-2024-lumaria-economic-data.xlsx")
+```
+
+```{r data cleaning}
+applicablerates = subset(inflationrates, ...1==2001 | ...1==2002 | ...1==2003 |...1==2004 |...1==2005 |...1==2006 |...1==2007 |...1==2008 |...1==2009 |...1==2010 |...1==2011 |...1==2012 |...1==2013 |...1==2014 |...1==2015 |...1==2016 |...1==2017 |...1==2018 |...1==2019 |...1==2020 |...1==2021 |...1==2022 | ...1==2023)[,2]
+applicablerates = as.numeric(unlist(applicablerates))+1
+```
+
+```{r Henry}
+smokers = subset(data, X.5=="S")
+nonsmokers = subset(data, X.5=="NS")
+deadsmokers = subset(smokers, X.10==1)
+deadnonsmokers = subset(nonsmokers, X.10==1)
+dead = subset(data, X.10==1)
+
+#adjust payments for inflation to 2023
+dead$X.15 = 2023-as.integer(dead$X.11)
+for (i in 1:nrow(dead)) {
+  dead$X.16[i] = as.numeric(dead$X.4[i]) * prod(applicablerates[(22-dead$X.15[i]):22])
+}
+
+for (i in 1:nrow(inflationsum_by_year)) {
+  inflationsum_by_year$X.11[i] = as.numeric(inflationsum_by_year$X.11[i])
+}
+
+# Sort the data frame by year
+inflationsum_by_year <- inflationsum_by_year[order(inflationsum_by_year$X.11), ]
+
+# Now, create the plot
+ggplot(data = inflationsum_by_year, aes(x = X.11, y = X.16)) + 
+  geom_point(color = "#627254") +
+  geom_line(aes(group = 1), color = "#627254") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+  xlab('Year') +
+  ylab('Total Amount (Č)') +
+  ggtitle("Total Adjusted Claims Over Time")
+###We can see from this graph that the total adjusted claims abnormally spikes in 2020, but using
+###the graph below of the number of new policies each year we can see that it's not caused
+###by a surge of policy members. We can also see from the barplot of causes of death since 2020
+###the proportions are similar to that of all causes of death since 2001 meaning that no surge
+###of unrelated causes (such as an epidemic or war) caused the spike of total claims
+
+#barplot of cause of death throughout lumaria
+barplot(prop.table(table(dead$X.14)), cex.names = 0.7, las=2)
+
+dead_causes <- prop.table(table(dead$X.14))
+dead_causes_df <- as.data.frame(dead_causes)
+names(dead_causes_df) <- c("Cause", "Proportion")
+ggplot(dead_causes_df, aes(x = Cause, y = Proportion, fill = Cause)) + 
+  geom_bar(stat = "identity", color = "#627254", fill = "#627254") + 
+  theme_minimal() + 
+  scale_fill_manual(values = c("#627254")) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, size = rel(0.7))) +
+  labs(x = "Cause of Death", y = "Proportion", title = "Cause of Death in Lumaria", fill = NULL)
+
+#barplot of cause of death for smokers in lumaria
+barplot(prop.table(table(deadsmokers$X.14)), main="Smokers Cause of Death", cex.names = 0.7, las=2)
+
+dead_smokers_causes <- prop.table(table(deadsmokers$X.14))
+dead_smokers_causes_df <- as.data.frame(dead_smokers_causes)
+names(dead_smokers_causes_df) <- c("Cause", "Proportion")
+
+ggplot(dead_smokers_causes_df, aes(x = Cause, y = Proportion, fill = Cause)) +
+  geom_bar(stat = "identity", color = "#627254", fill = "#627254") + 
+  theme_minimal() + 
+  scale_fill_manual(values = c("#627254")) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, size = rel(0.7))) +
+  labs(x = "Cause of Death", y = "Proportion", title = "Smokers Cause of Death in Lumaria", fill = NULL)
+
+#barplot of cause of death for nonsmokers in lumaria
+barplot(prop.table(table(deadnonsmokers$X.14)), main="Nonsmokers Cause of Death", cex.names = 0.7, las=2)
+
+# Create a proportion table for dead nonsmokers' causes of death
+dead_nonsmokers_causes <- prop.table(table(deadnonsmokers$X.14))
+dead_nonsmokers_causes_df <- as.data.frame(dead_nonsmokers_causes)
+names(dead_nonsmokers_causes_df) <- c("Cause", "Proportion")
+
+ggplot(dead_nonsmokers_causes_df, aes(x = Cause, y = Proportion, fill = Cause)) +
+  geom_bar(stat = "identity", color = "#627254", fill = "#627254") + 
+  theme_minimal() + 
+  scale_fill_manual(values = c("#627254")) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, size = rel(0.7))) +
+  labs(x = "Cause of Death", y = "Proportion", title = "Nonsmokers Cause of Death in Lumaria", fill = NULL)
+
+#stacked barplot of the cause of death by each region
+region1 = subset(dead, X.8==1)
+region2 = subset(dead, X.8==2)
+region3 = subset(dead, X.8==3)
+region4 = subset(dead, X.8==4)
+region5 = subset(dead, X.8==5)
+region6 = subset(dead, X.8==6)
+matrix = matrix(c(prop.table(table(region1$X.14)), 
+                  prop.table(table(region2$X.14)), 
+                  prop.table(table(region3$X.14)), 
+                  prop.table(table(region4$X.14)), 
+                  prop.table(table(region5$X.14)), 
+                  prop.table(table(region6$X.14))), ncol=6, byrow=TRUE)
+matrix = t(matrix)
+colorlist = c("blue", 
+           "orange", 
+           "red", 
+           "yellow", 
+           "purple", 
+           "pink")
+barplot(matrix, names.arg=names(table(dead$X.14)), cex.names = 0.7, las=2, beside = FALSE, col = colorlist)
+legend(x=0,y=0.7, cex=0.5, fill=colorlist, legend=c("region 1", "region 2", "region 3", "region 4", "region 5", "region 6"))
+
+# Create a combined data frame with cause of death, region, and compute the proportion within each region
+dead_regions <- dead %>%
+  filter(X.10 == 1) %>%
+  group_by(X.8, X.14) %>%
+  summarise(Count = n(), .groups = 'drop') %>%
+  mutate(Total = sum(Count), Proportion = Count / Total) %>%
+  ungroup() %>%
+  select(Region = X.8, Cause = X.14, Proportion)
+
+# Convert 'Region' to a factor for meaningful labels
+dead_regions$Region <- factor(dead_regions$Region, labels = paste("Region", 1:6))
+
+green_color_list <- c(
+  "Region 1" = "#627254",  # The base dark green you've been using
+  "Region 2" = "#8AA484",  # A slightly lighter green
+  "Region 3" = "#A7B8A0",  # An even lighter shade of green
+  "Region 4" = "#BAC8B4",  # Light green
+  "Region 5" = "#D0D9C7",  # Pale green
+  "Region 6" = "#E0E9DA"   # Very pale green
+)
+
+# Create the stacked barplot with the updated green color palette
+ggplot(dead_regions, aes(x = Cause, y = Proportion, fill = Region)) +
+  geom_bar(stat = "identity", position = "fill") +  # 'fill' stacks the bars to represent proportions
+  scale_fill_manual(values = green_color_list) +  # Apply the custom green color list
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, size = rel(0.7))) +  # And for the title
+  labs(x = "Cause of Death", y = "Proportion", title = "Cause of Death by Region in Lumaria", fill = "Region")
+```
