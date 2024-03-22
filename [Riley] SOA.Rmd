@@ -19,6 +19,9 @@ if (!require(dotenv)) {install.packages("dotenv"); library(dotenv)}
 if (!require(ggplot2)) {install.packages("ggplot2"); library(ggplot2)}
 if (!require(readxl)) {install.packages("readxl"); library(readxl)}
 if (!require(mgcv)) {install.packages("mgcv"); library(mgcv)}
+if (!require(plotly)) {install.packages("plotly"); library(plotly)}
+if (!require(RColorBrewer)) {install.packages("RColorBrewer"); library(RColorBrewer)}
+if (!require(rgl)) {install.packages("rgl"); library(rgl)}
 ```
 
 ```{r data}
@@ -65,6 +68,10 @@ ggplot(data = inflationsum_by_year, aes(x = X.11, y = X.16)) +
 ###by a surge of policy members. We can also see from the barplot of causes of death since 2020
 ###the proportions are similar to that of all causes of death since 2001 meaning that no surge
 ###of unrelated causes (such as an epidemic or war) caused the spike of total claims
+
+plot(table(data$X.1), las=2)
+recentlydead = subset(data, X.11==2020 | X.11==2021 | X.11==2022 | X.11==2023)
+barplot(prop.table(table(recentlydead$X.14)), cex.names = 0.7, las=2)
 
 #barplot of cause of death throughout lumaria
 barplot(prop.table(table(dead$X.14)), cex.names = 0.7, las=2)
@@ -159,4 +166,65 @@ ggplot(dead_regions, aes(x = Cause, y = Proportion, fill = Region)) +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, size = rel(0.7))) +  # And for the title
   labs(x = "Cause of Death", y = "Proportion", title = "Cause of Death by Region in Lumaria", fill = "Region")
+```
+
+```{r Riley}
+data = read.csv("./data/2024-srcsc-superlife-inforce-dataset.csv")
+# Data Cleaning
+colnames(data) <- as.character(unlist(data[3,]))
+data <- data[-1:-3,]
+rownames(data) <- NULL
+
+variables <- names(data)
+variables <- variables[!(variables %in% c("Smoker.Status", "Policy.number"))]
+smoker_status_proportions <- list()
+
+for (var in variables) {
+  freq_table <- table(data[[var]], data$Smoker.Status)
+  
+  # Calculate proportions
+  prop_table <- prop.table(freq_table, margin = 2)
+  
+  smoker_status_proportions[[var]] <- prop_table
+}
+smoker_status_proportions
+  
+# Define columns to exclude from numeric conversion
+exclude_columns <- c("Policy.number", "Policy.type", "Sex", "Smoker.Status", 
+                     "Underwriting.Class", "Urban.vs.Rural", 
+                     "Distribution.Channel", "Cause.of.Death")
+
+# Convert all other columns to numeric
+for (col_name in names(data)) {
+  # Check if the column is not in the list of columns to exclude
+  if (!(col_name %in% exclude_columns)) {
+    # Convert the column to numeric
+    data[[col_name]] <- as.numeric(as.character(data[[col_name]]))
+  }
+}
+
+unique(data$Smoker.Status)
+table(data$Smoker.Status)
+sum(is.na(data$Smoker.Status))
+sum(is.na(data$Issue.age))
+sum(is.na(data$Face.amount))
+sum(is.na(data$Underwriting.Class))
+data$Smoker.Status <- as.factor(data$Smoker.Status)
+summary(data$Smoker.Status)
+
+set.seed(123) # Setting a seed for reproducibility
+sampled_data <- data[sample(nrow(data), 100000), ]
+
+colors <- c('S' = 'red', 'NS' = 'blue')
+
+fig <- plot_ly(sampled_data, x = ~Issue.age, y = ~Face.amount, z = ~Underwriting.Class, type = 'scatter3d', 
+               color = ~factor(Smoker.Status), colors = colors, 
+               mode = 'markers',
+               marker = list(size = 2, opacity = 0.8)) %>%
+       layout(title = '',
+              scene = list(xaxis = list(title = 'Issue Age'),
+                           yaxis = list(title = 'Face Amount'),
+                           zaxis = list(title = 'Underwriting Class')))
+
+fig
 ```
