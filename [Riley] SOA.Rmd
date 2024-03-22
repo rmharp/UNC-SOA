@@ -21,7 +21,11 @@ if (!require(readxl)) {install.packages("readxl"); library(readxl)}
 if (!require(mgcv)) {install.packages("mgcv"); library(mgcv)}
 if (!require(plotly)) {install.packages("plotly"); library(plotly)}
 if (!require(RColorBrewer)) {install.packages("RColorBrewer"); library(RColorBrewer)}
-if (!require(rgl)) {install.packages("rgl"); library(rgl)}
+if (!require(rpart)) {install.packages("rpart"); library(rpart)}
+if (!require(rpart.plot)) {install.packages("rpart.plot"); library(rpart.plot)}
+if (!require(corrplot)) {install.packages("corrplot"); library(corrplot)}
+if (!require(tibble)) {install.packages("tibble"); library(tibble)}
+if (!require(reshape2)) {install.packages("reshape2"); library(reshape2)}
 ```
 
 ```{r data}
@@ -138,6 +142,8 @@ colorlist = c("blue",
 barplot(matrix, names.arg=names(table(dead$X.14)), cex.names = 0.7, las=2, beside = FALSE, col = colorlist)
 legend(x=0,y=0.7, cex=0.5, fill=colorlist, legend=c("region 1", "region 2", "region 3", "region 4", "region 5", "region 6"))
 
+
+
 # Create a combined data frame with cause of death, region, and compute the proportion within each region
 dead_regions <- dead %>%
   filter(X.10 == 1) %>%
@@ -159,6 +165,13 @@ green_color_list <- c(
   "Region 6" = "#E0E9DA"   # Very pale green
 )
 
+ggplot(matrix, aes(x = names(table(dead$X.14)), y = matrix, fill = x)) +
+  geom_bar(stat = "identity", position = "fill") +  # 'fill' stacks the bars to represent proportions
+  scale_fill_manual(values = green_color_list) +  # Apply the custom green color list
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, size = rel(0.7))) +  # And for the title
+  labs(x = "Cause of Death", y = "Proportion", title = "Cause of Death by Region in Lumaria", fill = "Region")
+
 # Create the stacked barplot with the updated green color palette
 ggplot(dead_regions, aes(x = Cause, y = Proportion, fill = Region)) +
   geom_bar(stat = "identity", position = "fill") +  # 'fill' stacks the bars to represent proportions
@@ -167,6 +180,34 @@ ggplot(dead_regions, aes(x = Cause, y = Proportion, fill = Region)) +
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, size = rel(0.7))) +  # And for the title
   labs(x = "Cause of Death", y = "Proportion", title = "Cause of Death by Region in Lumaria", fill = "Region")
 ```
+
+```{r}
+cause_of_death_names <- unique(data$Cause.of.Death)
+Death.indicator
+
+# Convert the matrix to a data frame and add the cause of death names
+df_matrix <- as.data.frame(matrix)
+colnames(df_matrix) <- cause_of_death_names
+
+# Add a column for Region
+df_matrix$Region <- paste("Region", seq_len(nrow(df_matrix)))
+
+# Melt the data frame into long format for ggplot2
+df_long <- melt(df_matrix, id.vars = "Region", variable.name = "Cause_of_Death", value.name = "Proportion")
+
+# Ensure 'Region' is ordered correctly in the factor levels
+df_long$Region <- factor(df_long$Region, levels = paste("Region", seq_len(nrow(df_matrix))))
+
+# Now plot using ggplot2
+ggplot(df_long, aes(x = Cause_of_Death, y = Proportion, fill = Region)) +
+  geom_bar(stat = "identity", position = "fill") +
+  scale_fill_manual(values = green_color_list) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  labs(x = "Cause of Death", y = "Proportion", fill = "Region", 
+       title = "Proportions of Causes of Death by Region")
+```
+
 
 ```{r Riley}
 data = read.csv("./data/2024-srcsc-superlife-inforce-dataset.csv")
@@ -187,7 +228,19 @@ for (var in variables) {
   
   smoker_status_proportions[[var]] <- prop_table
 }
-smoker_status_proportions
+
+proportions_df <- as.data.frame(smoker_status_proportions[["Issue.age"]]) %>%
+  rename(Issue.age = Var1, Status = Var2, Proportion = Freq)
+
+ggplot(proportions_df, aes(x = Issue.age, y = Proportion, group = Status, color = Status)) +
+  geom_line() +
+  scale_color_manual(values = c("S" = "#627254", "NS" = "#8AA484")) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.5, size = rel(0.7))) +
+  labs(title = "Proportions by Issue Age for Smokers and Non-Smokers",
+       x = "Issue Age",
+       y = "Proportion",
+       color = "Status Legend")
   
 # Define columns to exclude from numeric conversion
 exclude_columns <- c("Policy.number", "Policy.type", "Sex", "Smoker.Status", 
@@ -212,10 +265,10 @@ sum(is.na(data$Underwriting.Class))
 data$Smoker.Status <- as.factor(data$Smoker.Status)
 summary(data$Smoker.Status)
 
-set.seed(123) # Setting a seed for reproducibility
+set.seed(123)
 sampled_data <- data[sample(nrow(data), 100000), ]
 
-colors <- c('S' = 'red', 'NS' = 'blue')
+colors <- c('S' = '#627254', 'NS' = '#8AA484')
 
 fig <- plot_ly(sampled_data, x = ~Issue.age, y = ~Face.amount, z = ~Underwriting.Class, type = 'scatter3d', 
                color = ~factor(Smoker.Status), colors = colors, 
@@ -227,4 +280,14 @@ fig <- plot_ly(sampled_data, x = ~Issue.age, y = ~Face.amount, z = ~Underwriting
                            zaxis = list(title = 'Underwriting Class')))
 
 fig
+data$Death.indicator[is.na(data$Death.indicator)] <- 0
+data$Death.indicator <- as.factor(data$Death.indicator)
+sum(is.na(data))
+
+data$Death.indicator <- as.factor(data$Death.indicator)
+model <- rpart(Death.indicator ~ ., data = data, method = "class", minsplit = 20, minbucket = 10, cp = 0.001)
+numeric_data <- data[sapply(data, is.numeric)]
+corrplot(correlation_matrix, method = "circle")
+
+
 ```
